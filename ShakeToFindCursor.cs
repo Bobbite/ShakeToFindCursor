@@ -11,8 +11,8 @@ namespace ShakeToFindCursor
 {
     public enum RenderMode
     {
-        OverlayOnly = 0, // Clean Overlay Mode (Zero DWM phantom cursor artifacts!)
-        HideNativeCursor = 1, // System Cursor Swap Mode
+        OverlayOnly = 0, // Standard Overlay Mode (Clean, recommended)
+        HideNativeCursor = 1 // Hide Original Cursor Mode
     }
 
     // ==========================================
@@ -175,7 +175,7 @@ namespace ShakeToFindCursor
             ShrinkSpeed = 0.20;
             Enabled = true;
             StartWithWindows = false;
-            Mode = RenderMode.OverlayOnly; // Clean Overlay mode default to prevent DWM phantom cursor bugs
+            Mode = RenderMode.OverlayOnly; // Standard Overlay mode default
         }
 
         private static string ConfigPath
@@ -304,7 +304,6 @@ namespace ShakeToFindCursor
         {
             if (_hBlankCursor == IntPtr.Zero)
             {
-                // Create 100% transparent Win32 cursor using 1bpp masks
                 byte[] andMask = new byte[32];
                 for (int i = 0; i < andMask.Length; i++) andMask[i] = 0xFF; // 1s = transparent
 
@@ -397,7 +396,6 @@ namespace ShakeToFindCursor
                 int dotProduct = dx * _lastDx + dy * _lastDy;
                 if (dotProduct < 0) // Sharp direction reversal!
                 {
-                    // Accumulate shake energy on each reversal
                     double addEnergy = dist * 1.5 * settings.Sensitivity;
                     _shakeEnergy += addEnergy;
                 }
@@ -412,7 +410,6 @@ namespace ShakeToFindCursor
             _shakeEnergy *= 0.88;
             if (_shakeEnergy < 0.1) _shakeEnergy = 0.0;
 
-            // Trigger threshold (normal mouse movements have energy = 0 and won't trigger!)
             double triggerThreshold = 14.0 / Math.Max(0.2, settings.Sensitivity);
             double targetScale = 1.0;
 
@@ -421,7 +418,6 @@ namespace ShakeToFindCursor
                 double excess = _shakeEnergy - triggerThreshold;
                 double maxScaleFactor = settings.MaxCursorSize / 32.0;
 
-                // Progressive curve: grows a little on 1st shake, more on 2nd, up to max size cap!
                 double scaleAdd = Math.Min(maxScaleFactor - 1.0, excess * 0.035);
                 targetScale = 1.0 + scaleAdd;
             }
@@ -429,11 +425,11 @@ namespace ShakeToFindCursor
             // Smooth spring / interpolation towards target scale
             if (targetScale > _currentScale)
             {
-                _currentScale += (targetScale - _currentScale) * 0.25; // Smooth gradual growth
+                _currentScale += (targetScale - _currentScale) * 0.25;
             }
             else
             {
-                _currentScale += (targetScale - _currentScale) * settings.ShrinkSpeed; // Smooth shrink
+                _currentScale += (targetScale - _currentScale) * settings.ShrinkSpeed;
             }
 
             if (_currentScale < 1.05)
@@ -460,7 +456,6 @@ namespace ShakeToFindCursor
             this.TopMost = true;
             this.DoubleBuffered = true;
 
-            // Ensure window creation handles WS_EX_LAYERED properly
             IntPtr h = this.Handle;
         }
 
@@ -491,13 +486,11 @@ namespace ShakeToFindCursor
                 return;
             }
 
-            // Optional System Cursor Swap mode if explicitly requested
             if (_settings.Mode == RenderMode.HideNativeCursor && !NativeCursorHelper.IsHidden)
             {
                 NativeCursorHelper.HideNativeCursor();
             }
 
-            // Ensure access to active input desktop
             IntPtr hDesk = NativeMethods.OpenInputDesktop(0, false, 0x0100);
             if (hDesk != IntPtr.Zero)
             {
@@ -513,7 +506,6 @@ namespace ShakeToFindCursor
                 return;
             }
 
-            // Always use cached Default Arrow Pointer when enlarged (ignores text I-beam, link hands, crosshairs!)
             IntPtr hArrowCursor = NativeCursorHelper.GetDefaultArrowCursor();
             if (hArrowCursor == IntPtr.Zero)
             {
@@ -544,7 +536,6 @@ namespace ShakeToFindCursor
             int windowX = ci.ptScreenPos.x - scaledHotspotX;
             int windowY = ci.ptScreenPos.y - scaledHotspotY;
 
-            // Render cursor into 32-bit ARGB bitmap
             using (Bitmap bitmap = new Bitmap(targetSize, targetSize, PixelFormat.Format32bppArgb))
             {
                 using (Graphics g = Graphics.FromImage(bitmap))
@@ -589,7 +580,6 @@ namespace ShakeToFindCursor
 
         private void ClearAndHideOverlay()
         {
-            // Flush DWM layered surface with empty 0-alpha 1x1 bitmap AND move off-screen (-10000, -10000)
             using (Bitmap emptyBmp = new Bitmap(1, 1, PixelFormat.Format32bppArgb))
             {
                 UpdateLayeredWindowBitmap(emptyBmp, -10000, -10000, 1, 1);
@@ -657,7 +647,7 @@ namespace ShakeToFindCursor
     }
 
     // ==========================================
-    // Modern Windows 11 Styled Settings Dialog
+    // Modern Windows 11 Resizable Settings Dialog
     // ==========================================
     public class SettingsForm : Form
     {
@@ -675,11 +665,12 @@ namespace ShakeToFindCursor
         private CheckBox chkEnabled;
         private CheckBox chkStartup;
 
-        private RadioButton rbCleanOverlayMode;
-        private RadioButton rbSystemSwapMode;
+        private RadioButton rbStandardOverlay;
+        private RadioButton rbHideNative;
 
         private Button btnTestShake;
-        private Button btnSave;
+        private Button btnSaveAndClose;
+        private Button btnApply;
         private Button btnCancel;
         private Label lblStatus;
 
@@ -695,17 +686,19 @@ namespace ShakeToFindCursor
         private void InitializeComponent()
         {
             this.Text = "Shake to Find Cursor - Settings";
-            this.Size = new Size(520, 640);
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.Size = new Size(560, 710);
+            this.MinimumSize = new Size(520, 680);
+            this.FormBorderStyle = FormBorderStyle.Sizable; // User resizable!
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(32, 32, 32); // Modern Dark mode background
+            this.BackColor = Color.FromArgb(32, 32, 32); // Modern Dark mode
             this.ForeColor = Color.White;
             this.Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
+            this.AutoScroll = true; // Auto scrollbar if screen height is small
 
             int leftMargin = 30;
-            int rightAlign = 440;
+            int rightAlign = 470;
             int currentY = 25;
 
             // Title Label
@@ -722,17 +715,16 @@ namespace ShakeToFindCursor
             currentY += 40;
             Label lblSubTitle = new Label
             {
-                Text = "Enlarges your mouse cursor up to 300px when shaken.",
+                Text = "Enlarges your mouse cursor up to 300px when rapidly shaken.",
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
                 ForeColor = Color.FromArgb(200, 200, 200),
                 Location = new Point(leftMargin, currentY),
-                Size = new Size(440, 40)
+                Size = new Size(460, 30)
             };
             this.Controls.Add(lblSubTitle);
 
-            currentY += 45;
-            // Divider
-            Panel pnlDiv1 = new Panel { BackColor = Color.FromArgb(50, 50, 50), Location = new Point(leftMargin, currentY), Size = new Size(440, 1) };
+            currentY += 38;
+            Panel pnlDiv1 = new Panel { BackColor = Color.FromArgb(50, 50, 50), Location = new Point(leftMargin, currentY), Size = new Size(460, 1) };
             this.Controls.Add(pnlDiv1);
 
             // Enable Toggle
@@ -762,10 +754,10 @@ namespace ShakeToFindCursor
             this.Controls.Add(chkStartup);
 
             currentY += 40;
-            // Render Mode Group Box
+            // Clear, Human-Friendly Mode Selector
             Label lblRenderMode = new Label
             {
-                Text = "Enlargement Behavior:",
+                Text = "Cursor Display Style:",
                 Font = new Font("Segoe UI Semibold", 10F),
                 ForeColor = Color.White,
                 Location = new Point(leftMargin, currentY),
@@ -774,27 +766,27 @@ namespace ShakeToFindCursor
             this.Controls.Add(lblRenderMode);
 
             currentY += 25;
-            rbCleanOverlayMode = new RadioButton
+            rbStandardOverlay = new RadioButton
             {
-                Text = "🌟 Smooth Overlay Mode (Zero DWM phantom artifacts - Recommended)",
+                Text = "🌟 Standard Pointer Overlay (Recommended)",
                 Font = new Font("Segoe UI", 9.5F),
                 ForeColor = Color.FromArgb(96, 205, 255),
                 Location = new Point(leftMargin + 10, currentY),
-                Size = new Size(430, 25),
+                Size = new Size(440, 25),
                 Checked = true
             };
-            this.Controls.Add(rbCleanOverlayMode);
+            this.Controls.Add(rbStandardOverlay);
 
             currentY += 28;
-            rbSystemSwapMode = new RadioButton
+            rbHideNative = new RadioButton
             {
-                Text = "System Cursor Swap Mode",
+                Text = "Hide Original Cursor While Enlarged",
                 Font = new Font("Segoe UI", 9.5F),
                 ForeColor = Color.FromArgb(200, 200, 200),
                 Location = new Point(leftMargin + 10, currentY),
-                Size = new Size(430, 25)
+                Size = new Size(440, 25)
             };
-            this.Controls.Add(rbSystemSwapMode);
+            this.Controls.Add(rbHideNative);
 
             currentY += 40;
             // Slider 1: Max Cursor Size
@@ -826,7 +818,7 @@ namespace ShakeToFindCursor
                 LargeChange = 50,
                 TickFrequency = 50,
                 Location = new Point(leftMargin - 5, currentY),
-                Size = new Size(450, 45),
+                Size = new Size(470, 45),
                 BackColor = Color.FromArgb(32, 32, 32)
             };
             tbMaxSize.ValueChanged += (s, e) => { lblMaxSizeVal.Text = string.Format("{0} px", tbMaxSize.Value); };
@@ -862,7 +854,7 @@ namespace ShakeToFindCursor
                 LargeChange = 5,
                 TickFrequency = 5,
                 Location = new Point(leftMargin - 5, currentY),
-                Size = new Size(450, 45),
+                Size = new Size(470, 45),
                 BackColor = Color.FromArgb(32, 32, 32)
             };
             tbSensitivity.ValueChanged += (s, e) => { lblSensitivityVal.Text = string.Format("{0:0.0} x", tbSensitivity.Value / 10.0); };
@@ -898,7 +890,7 @@ namespace ShakeToFindCursor
                 LargeChange = 10,
                 TickFrequency = 5,
                 Location = new Point(leftMargin - 5, currentY),
-                Size = new Size(450, 45),
+                Size = new Size(470, 45),
                 BackColor = Color.FromArgb(32, 32, 32)
             };
             tbShrinkSpeed.ValueChanged += (s, e) => {
@@ -928,35 +920,50 @@ namespace ShakeToFindCursor
 
             lblStatus = new Label
             {
-                Text = "Off-Screen Reset: Active",
+                Text = "Ready",
                 Font = new Font("Segoe UI", 9F, FontStyle.Italic),
                 ForeColor = Color.FromArgb(160, 160, 160),
                 Location = new Point(leftMargin + 215, currentY + 8),
-                Size = new Size(220, 25)
+                Size = new Size(240, 25)
             };
             this.Controls.Add(lblStatus);
 
             currentY += 50;
-            // Divider 2
-            Panel pnlDiv2 = new Panel { BackColor = Color.FromArgb(50, 50, 50), Location = new Point(leftMargin, currentY), Size = new Size(440, 1) };
+            Panel pnlDiv2 = new Panel { BackColor = Color.FromArgb(50, 50, 50), Location = new Point(leftMargin, currentY), Size = new Size(460, 1) };
             this.Controls.Add(pnlDiv2);
 
             currentY += 15;
-            // Save & Cancel Buttons
-            btnSave = new Button
+            // Bottom Left: "Save & Close" button
+            btnSaveAndClose = new Button
             {
-                Text = "Save & Apply",
+                Text = "Save & Close",
                 Font = new Font("Segoe UI Semibold", 10F),
                 BackColor = Color.FromArgb(0, 120, 212), // Windows accent blue
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Location = new Point(rightAlign - 210, currentY),
-                Size = new Size(110, 36),
+                Location = new Point(leftMargin, currentY),
+                Size = new Size(130, 36),
                 Cursor = Cursors.Hand
             };
-            btnSave.FlatAppearance.BorderSize = 0;
-            btnSave.Click += BtnSave_Click;
-            this.Controls.Add(btnSave);
+            btnSaveAndClose.FlatAppearance.BorderSize = 0;
+            btnSaveAndClose.Click += BtnSaveAndClose_Click;
+            this.Controls.Add(btnSaveAndClose);
+
+            // Bottom Right: "Apply" and "Cancel" buttons
+            btnApply = new Button
+            {
+                Text = "Apply",
+                Font = new Font("Segoe UI Semibold", 10F),
+                BackColor = Color.FromArgb(55, 55, 55),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(rightAlign - 180, currentY),
+                Size = new Size(85, 36),
+                Cursor = Cursors.Hand
+            };
+            btnApply.FlatAppearance.BorderColor = Color.FromArgb(90, 90, 90);
+            btnApply.Click += BtnApply_Click;
+            this.Controls.Add(btnApply);
 
             btnCancel = new Button
             {
@@ -965,8 +972,8 @@ namespace ShakeToFindCursor
                 BackColor = Color.FromArgb(45, 45, 45),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Location = new Point(rightAlign - 90, currentY),
-                Size = new Size(90, 36),
+                Location = new Point(rightAlign - 85, currentY),
+                Size = new Size(85, 36),
                 Cursor = Cursors.Hand
             };
             btnCancel.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
@@ -979,8 +986,8 @@ namespace ShakeToFindCursor
             chkEnabled.Checked = _settings.Enabled;
             chkStartup.Checked = _settings.StartWithWindows;
 
-            if (_settings.Mode == RenderMode.OverlayOnly) rbCleanOverlayMode.Checked = true;
-            else rbSystemSwapMode.Checked = true;
+            if (_settings.Mode == RenderMode.OverlayOnly) rbStandardOverlay.Checked = true;
+            else rbHideNative.Checked = true;
 
             tbMaxSize.Value = Math.Max(100, Math.Min(500, _settings.MaxCursorSize));
             lblMaxSizeVal.Text = string.Format("{0} px", tbMaxSize.Value);
@@ -997,16 +1004,27 @@ namespace ShakeToFindCursor
             else lblShrinkSpeedVal.Text = "Fast";
         }
 
-        private void BtnSave_Click(object sender, EventArgs e)
+        private void ApplyUIToSettings()
         {
             _settings.Enabled = chkEnabled.Checked;
             _settings.StartWithWindows = chkStartup.Checked;
-            _settings.Mode = rbCleanOverlayMode.Checked ? RenderMode.OverlayOnly : RenderMode.HideNativeCursor;
+            _settings.Mode = rbStandardOverlay.Checked ? RenderMode.OverlayOnly : RenderMode.HideNativeCursor;
             _settings.MaxCursorSize = tbMaxSize.Value;
             _settings.Sensitivity = tbSensitivity.Value / 10.0;
             _settings.ShrinkSpeed = tbShrinkSpeed.Value / 100.0;
+        }
 
-            _settings.Save();
+        private void BtnApply_Click(object sender, EventArgs e)
+        {
+            ApplyUIToSettings();
+            lblStatus.Text = "✓ Settings Applied! (Shake to test)";
+            lblStatus.ForeColor = Color.FromArgb(96, 205, 255);
+        }
+
+        private void BtnSaveAndClose_Click(object sender, EventArgs e)
+        {
+            ApplyUIToSettings();
+            _settings.Save(); // Writes to config disk file & updates Windows Registry startup
             this.Close();
         }
     }
