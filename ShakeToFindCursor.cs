@@ -937,12 +937,13 @@ namespace ShakeToFindCursor
             btnSaveAndClose = new Button
             {
                 Text = "Save & Close",
+                UseMnemonic = false,
                 Font = new Font("Segoe UI Semibold", 10F),
                 BackColor = Color.FromArgb(0, 120, 212), // Windows accent blue
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Location = new Point(leftMargin, currentY),
-                Size = new Size(130, 36),
+                Size = new Size(145, 36),
                 Cursor = Cursors.Hand
             };
             btnSaveAndClose.FlatAppearance.BorderSize = 0;
