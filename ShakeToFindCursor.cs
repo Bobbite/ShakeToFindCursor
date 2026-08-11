@@ -1666,43 +1666,41 @@ namespace ShakeToFindCursor
                     g.SmoothingMode = SmoothingMode.AntiAlias;
                     g.Clear(Color.Transparent);
 
-                    float s = size / 48.0f;
+                    float s = size / 256.0f;
 
-                    PointF pTip = new PointF(8 * s, 4 * s);
-                    PointF pMidLeft = new PointF(8 * s, 26 * s);
-                    PointF pBottomLeft = new PointF(8 * s, 44 * s);
-                    PointF pRight = new PointF(38 * s, 33 * s);
-                    PointF pNotch = new PointF(24 * s, 27 * s);
+                    PointF pTip = new PointF(30f * s, 20f * s);
+                    PointF pBottom = new PointF(30f * s, 210f * s);
+                    PointF pNotch = new PointF(110f * s, 155f * s);
+                    PointF pTail = new PointF(165f * s, 225f * s);
+                    PointF pTailRight = new PointF(205f * s, 190f * s);
+                    PointF pNotchRight = new PointF(145f * s, 130f * s);
+                    PointF pRight = new PointF(210f * s, 120f * s);
 
-                    PointF[] polyTop = new PointF[] { pTip, pRight, pNotch, pMidLeft };
-                    PointF[] polyOrange = new PointF[] { pMidLeft, pNotch, pBottomLeft };
-                    PointF[] polyDark = new PointF[] { pNotch, pRight, pBottomLeft };
-                    PointF[] polyOuter = new PointF[] { pTip, pRight, pNotch, pBottomLeft };
+                    PointF[] arrowPoly = new PointF[]
+                    {
+                        pTip, pRight, pNotchRight, pTailRight, pTail, pNotch, pBottom
+                    };
 
-                    Color colorTop = Color.FromArgb(76, 98, 112);       // Slate Blue-Grey
-                    Color colorOrange = Color.FromArgb(252, 142, 56);   // Vibrant Orange
-                    Color colorDark = Color.FromArgb(27, 35, 40);       // Charcoal
-                    Color colorOutline = Color.FromArgb(16, 22, 26);    // Outer dark border
-                    Color colorDiv = Color.FromArgb(20, 26, 31);        // Facet divider
+                    PointF[] topFacet = new PointF[] { pTip, pRight, pNotchRight, pNotch };
+                    PointF[] bottomFacet = new PointF[] { pTip, pNotch, pBottom };
+                    PointF[] tailFacet = new PointF[] { pNotchRight, pTailRight, pTail, pNotch };
+
+                    Color colorTop = Color.FromArgb(96, 205, 255);      // Vibrant Cyan
+                    Color colorBottom = Color.FromArgb(0, 120, 212);    // Windows Blue
+                    Color colorTail = Color.FromArgb(252, 142, 56);     // Orange Accent
+                    Color colorWhiteBorder = Color.White;
 
                     using (SolidBrush bTop = new SolidBrush(colorTop))
-                        g.FillPolygon(bTop, polyTop);
-                    using (SolidBrush bOrange = new SolidBrush(colorOrange))
-                        g.FillPolygon(bOrange, polyOrange);
-                    using (SolidBrush bDark = new SolidBrush(colorDark))
-                        g.FillPolygon(bDark, polyDark);
+                        g.FillPolygon(bTop, topFacet);
+                    using (SolidBrush bBottom = new SolidBrush(colorBottom))
+                        g.FillPolygon(bBottom, bottomFacet);
+                    using (SolidBrush bTail = new SolidBrush(colorTail))
+                        g.FillPolygon(bTail, tailFacet);
 
-                    using (Pen pOut = new Pen(colorOutline, Math.Max(2f, 2.5f * s)))
+                    using (Pen pWhite = new Pen(colorWhiteBorder, Math.Max(3f, 14f * s)))
                     {
-                        pOut.LineJoin = LineJoin.Round;
-                        g.DrawPolygon(pOut, polyOuter);
-                    }
-
-                    using (Pen pDiv = new Pen(colorDiv, Math.Max(1f, 1.2f * s)))
-                    {
-                        g.DrawLine(pDiv, pMidLeft, pNotch);
-                        g.DrawLine(pDiv, pNotch, pBottomLeft);
-                        g.DrawLine(pDiv, pNotch, pRight);
+                        pWhite.LineJoin = LineJoin.Round;
+                        g.DrawPolygon(pWhite, arrowPoly);
                     }
                 }
                 return Icon.FromHandle(bmp.GetHicon());
