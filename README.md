@@ -24,6 +24,9 @@ A fast, lightweight, native Windows 11 utility inspired by **Bazzite** and **mac
   - **Start with Windows**: Toggle automatic startup on Windows boot.
 - 🚀 **Zero External Dependencies**: Single standalone executable (`ShakeToFindCursor.exe`). No extra runtimes or installers needed.
 
+  <p align="center" width="100%">
+<img width="660" height="420" alt="cursorsizegithub" src="https://github.com/user-attachments/assets/bb2ef9ba-97fd-4f94-9257-7fe2b5cba69c" />
+</p>
 ---
 
 ## 💾 Download & Installation
