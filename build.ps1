@@ -15,9 +15,12 @@ Write-Host "Compiling ShakeToFindCursor.cs..." -ForegroundColor Cyan
 $references = "System.dll", "System.Drawing.dll", "System.Windows.Forms.dll", "System.Core.dll"
 $refArgs = $references | ForEach-Object { "/r:$_" }
 
+$icoPath = Join-Path $PSScriptRoot "app.ico"
+
 $args = @(
     "/target:winexe",
     "/optimize",
+    "/win32icon:$icoPath",
     "/out:$outputExe"
 ) + $refArgs + @("$sourceFile")
 
