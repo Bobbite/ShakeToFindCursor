@@ -28,15 +28,10 @@ A fast, lightweight, native Windows 11 utility inspired by **Bazzite** and **mac
 
 ## 💾 Download & Installation
 
-### Option 1: Direct Executable Download (Recommended)
+Direct Executable Download
 1. Download [`ShakeToFindCursor.exe`](https://github.com/Bobbite/ShakeToFindCursor/releases/latest/download/ShakeToFindCursor.exe) from the [Releases Page](https://github.com/Bobbite/ShakeToFindCursor/releases).
 2. Double-click `ShakeToFindCursor.exe` to run it.
 3. Look for the blue mouse icon in your **Windows System Tray** (bottom right near the clock).
-
-### Option 2: Run at Windows Startup
-1. Double-click the System Tray icon to open **Settings**.
-2. Check **Start automatically with Windows**.
-3. Click **Save & Apply**.
 
 ---
 
