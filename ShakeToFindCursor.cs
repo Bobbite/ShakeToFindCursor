@@ -686,9 +686,8 @@ namespace ShakeToFindCursor
         private void InitializeComponent()
         {
             this.Text = "Shake to Find Cursor - Settings";
-            this.Size = new Size(560, 710);
-            this.MinimumSize = new Size(520, 680);
-            this.FormBorderStyle = FormBorderStyle.Sizable; // User resizable!
+            this.Size = new Size(560, 715);
+            this.FormBorderStyle = FormBorderStyle.FixedDialog; // Fixed size dialog
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
