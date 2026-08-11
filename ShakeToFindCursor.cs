@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -11,8 +12,8 @@ namespace ShakeToFindCursor
 {
     public enum RenderMode
     {
-        OverlayOnly = 0, // Standard Overlay Mode
-        HideNativeCursor = 1 // Hide Original Cursor Mode (Blanks all system cursors during shake)
+        OverlayOnly = 0, // Standard Overlay Mode (Zero system cursor modifications)
+        HideNativeCursor = 1 // Hide Original Cursor Mode (Blanks native cursors during shake)
     }
 
     public enum HotspotMode
@@ -91,7 +92,6 @@ namespace ShakeToFindCursor
 
         public const uint OCR_NORMAL = 32512;
         public const uint SPI_SETCURSORS = 0x0057;
-        public const uint SPIF_UPDATEINIFILE = 0x01;
         public const uint SPIF_SENDCHANGE = 0x02;
 
         public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
@@ -160,6 +160,9 @@ namespace ShakeToFindCursor
         public static extern IntPtr LoadCursor(IntPtr hInstance, uint lpCursorName);
 
         [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr LoadCursorFromFile(string lpFileName);
+
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr CopyIcon(IntPtr hIcon);
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -173,32 +176,31 @@ namespace ShakeToFindCursor
     {
         public int MaxCursorSize { get; set; }
         public double Sensitivity { get; set; }
-        public double TriggerThreshold { get; set; } // Required shake effort to start enlarging
+        public double TriggerThreshold { get; set; }
         public double ShrinkSpeed { get; set; }
         public bool Enabled { get; set; }
         public bool StartWithWindows { get; set; }
         public RenderMode Mode { get; set; }
 
-        // Custom Cursor Image Properties
         public bool UseCustomCursor { get; set; }
         public string CustomCursorPath { get; set; }
         public HotspotMode CustomHotspot { get; set; }
-        public double CustomHotspotXPercent { get; set; } // Manual X offset (0.0 to 0.5)
-        public double CustomHotspotYPercent { get; set; } // Manual Y offset (0.0 to 0.5)
+        public double CustomHotspotXPercent { get; set; }
+        public double CustomHotspotYPercent { get; set; }
 
         public Settings()
         {
-            MaxCursorSize = 300; // Cap around 300px by default
+            MaxCursorSize = 300;
             Sensitivity = 1.0;
-            TriggerThreshold = 14.0; // Default activation threshold
+            TriggerThreshold = 14.0;
             ShrinkSpeed = 0.20;
             Enabled = true;
             StartWithWindows = false;
-            Mode = RenderMode.HideNativeCursor; // Default to Hide Original Cursor mode
+            Mode = RenderMode.HideNativeCursor;
 
             UseCustomCursor = false;
             CustomCursorPath = "";
-            CustomHotspot = HotspotMode.AutoTip; // Auto-detect tip of graphic by default!
+            CustomHotspot = HotspotMode.AutoTip;
             CustomHotspotXPercent = 0.0;
             CustomHotspotYPercent = 0.0;
         }
@@ -321,6 +323,7 @@ namespace ShakeToFindCursor
         private static bool _isHidden = false;
         private static IntPtr _hBlankCursor = IntPtr.Zero;
         private static IntPtr _hCachedArrowCursor = IntPtr.Zero;
+        private static Dictionary<uint, IntPtr> _backedUpCursors = new Dictionary<uint, IntPtr>();
 
         public static readonly uint[] SystemCursorIds = new uint[]
         {
@@ -341,8 +344,56 @@ namespace ShakeToFindCursor
 
         public static bool IsHidden { get { return _isHidden; } }
 
+        public static void BackupSystemCursors()
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Control Panel\Cursors"))
+            {
+                string[] valueNames = new string[]
+                {
+                    "Arrow", "IBeam", "Wait", "Crosshair", "UpArrow",
+                    "SizeNWSE", "SizeNESW", "SizeWE", "SizeNS", "SizeAll",
+                    "No", "Hand", "AppStarting"
+                };
+
+                for (int i = 0; i < SystemCursorIds.Length && i < valueNames.Length; i++)
+                {
+                    uint id = SystemCursorIds[i];
+                    if (!_backedUpCursors.ContainsKey(id) || _backedUpCursors[id] == IntPtr.Zero)
+                    {
+                        string path = key != null ? key.GetValue(valueNames[i]) as string : null;
+                        IntPtr hCur = IntPtr.Zero;
+
+                        if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                        {
+                            hCur = NativeMethods.LoadCursorFromFile(path);
+                        }
+
+                        if (hCur == IntPtr.Zero)
+                        {
+                            IntPtr hCurrent = NativeMethods.LoadCursor(IntPtr.Zero, id);
+                            if (hCurrent != IntPtr.Zero) hCur = NativeMethods.CopyIcon(hCurrent);
+                        }
+
+                        if (hCur != IntPtr.Zero)
+                        {
+                            _backedUpCursors[id] = hCur;
+                        }
+                    }
+                }
+            }
+
+            if (_backedUpCursors.ContainsKey(NativeMethods.OCR_NORMAL))
+            {
+                _hCachedArrowCursor = _backedUpCursors[NativeMethods.OCR_NORMAL];
+            }
+        }
+
         public static IntPtr GetDefaultArrowCursor()
         {
+            if (_hCachedArrowCursor == IntPtr.Zero)
+            {
+                BackupSystemCursors();
+            }
             if (_hCachedArrowCursor == IntPtr.Zero)
             {
                 IntPtr hSystemArrow = NativeMethods.LoadCursor(IntPtr.Zero, NativeMethods.OCR_NORMAL);
@@ -371,7 +422,7 @@ namespace ShakeToFindCursor
 
         public static void HideNativeCursor()
         {
-            GetDefaultArrowCursor();
+            BackupSystemCursors();
 
             IntPtr hBlank = GetBlankCursor();
             if (hBlank != IntPtr.Zero)
@@ -389,8 +440,19 @@ namespace ShakeToFindCursor
         {
             if (!_isHidden) return;
 
-            // Notify Windows 11 DWM with SPIF_SENDCHANGE | SPIF_UPDATEINIFILE to restore full 32-bit hardware alpha cursors & shadows!
-            NativeMethods.SystemParametersInfo(NativeMethods.SPI_SETCURSORS, 0, IntPtr.Zero, NativeMethods.SPIF_UPDATEINIFILE | NativeMethods.SPIF_SENDCHANGE);
+            foreach (uint id in SystemCursorIds)
+            {
+                if (_backedUpCursors.ContainsKey(id) && _backedUpCursors[id] != IntPtr.Zero)
+                {
+                    IntPtr hRestoreCopy = NativeMethods.CopyIcon(_backedUpCursors[id]);
+                    if (hRestoreCopy != IntPtr.Zero)
+                    {
+                        NativeMethods.SetSystemCursor(hRestoreCopy, id);
+                    }
+                }
+            }
+
+            NativeMethods.SystemParametersInfo(NativeMethods.SPI_SETCURSORS, 0, IntPtr.Zero, NativeMethods.SPIF_SENDCHANGE);
             _isHidden = false;
         }
     }
@@ -447,11 +509,10 @@ namespace ShakeToFindCursor
             int dy = currentPos.y - _lastPos.y;
             double dist = Math.Sqrt(dx * dx + dy * dy);
 
-            // Velocity threshold (minimum 6.0 px per 10ms frame)
             if (dist > 6.0)
             {
                 int dotProduct = dx * _lastDx + dy * _lastDy;
-                if (dotProduct < 0) // Sharp direction reversal!
+                if (dotProduct < 0)
                 {
                     double addEnergy = dist * 1.5;
                     _shakeEnergy += addEnergy;
@@ -463,7 +524,6 @@ namespace ShakeToFindCursor
 
             _lastPos = currentPos;
 
-            // Natural energy decay per sample frame (~10ms)
             _shakeEnergy *= 0.88;
             if (_shakeEnergy < 0.1) _shakeEnergy = 0.0;
 
@@ -479,7 +539,6 @@ namespace ShakeToFindCursor
                 targetScale = 1.0 + scaleAdd;
             }
 
-            // Smooth spring / interpolation towards target scale
             if (targetScale > _currentScale)
             {
                 _currentScale += (targetScale - _currentScale) * 0.25;
@@ -705,7 +764,7 @@ namespace ShakeToFindCursor
                     scaledHotspotX = (int)(targetSize * _settings.CustomHotspotXPercent);
                     scaledHotspotY = (int)(targetSize * _settings.CustomHotspotYPercent);
                 }
-                else // Top-Left (0, 0)
+                else
                 {
                     scaledHotspotX = 0;
                     scaledHotspotY = 0;
@@ -1538,8 +1597,8 @@ namespace ShakeToFindCursor
             _detector = new ShakeDetector();
             _overlayForm = new OverlayForm(_settings);
 
-            // Pre-cache standard arrow cursor at startup
-            NativeCursorHelper.GetDefaultArrowCursor();
+            // Pre-cache & snapshot exact 32-bit hardware alpha custom cursors at startup
+            NativeCursorHelper.BackupSystemCursors();
 
             InitializeTray();
 
@@ -1623,7 +1682,7 @@ namespace ShakeToFindCursor
     // ==========================================
     // Application Icon Helper
     // ==========================================
-    public static class AppIconHelper
+    public class AppIconHelper
     {
         private static Icon _cachedIcon;
 
