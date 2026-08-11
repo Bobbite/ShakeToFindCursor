@@ -11,8 +11,8 @@ namespace ShakeToFindCursor
 {
     public enum RenderMode
     {
-        OverlayOnly = 0, // Standard Overlay Mode (Clean, recommended)
-        HideNativeCursor = 1 // Hide Original Cursor Mode
+        OverlayOnly = 0, // Standard Overlay Mode
+        HideNativeCursor = 1 // Hide Original Cursor Mode (Blanks all system cursors during shake)
     }
 
     // ==========================================
@@ -175,7 +175,7 @@ namespace ShakeToFindCursor
             ShrinkSpeed = 0.20;
             Enabled = true;
             StartWithWindows = false;
-            Mode = RenderMode.OverlayOnly; // Standard Overlay mode default
+            Mode = RenderMode.HideNativeCursor; // Default to Hide Original Cursor mode
         }
 
         private static string ConfigPath
@@ -277,13 +277,30 @@ namespace ShakeToFindCursor
     }
 
     // ==========================================
-    // Permanent Arrow Cursor Cache & Native Blanking Helper
+    // Global Native Cursor Blanking Helper
     // ==========================================
     public static class NativeCursorHelper
     {
         private static bool _isHidden = false;
         private static IntPtr _hBlankCursor = IntPtr.Zero;
         private static IntPtr _hCachedArrowCursor = IntPtr.Zero;
+
+        public static readonly uint[] SystemCursorIds = new uint[]
+        {
+            32512, // OCR_NORMAL (Arrow)
+            32513, // OCR_IBEAM (Text beam)
+            32514, // OCR_WAIT (Spinner)
+            32515, // OCR_CROSS (Crosshair)
+            32516, // OCR_UPARROW (Up arrow)
+            32642, // OCR_SIZENWSE
+            32643, // OCR_SIZENESW
+            32644, // OCR_SIZEWE
+            32645, // OCR_SIZENS
+            32646, // OCR_SIZEALL
+            32648, // OCR_NO
+            32649, // OCR_HAND (Link hand)
+            32650  // OCR_APPSTARTING
+        };
 
         public static bool IsHidden { get { return _isHidden; } }
 
@@ -304,6 +321,7 @@ namespace ShakeToFindCursor
         {
             if (_hBlankCursor == IntPtr.Zero)
             {
+                // Create 100% transparent Win32 cursor using 1bpp masks
                 byte[] andMask = new byte[32];
                 for (int i = 0; i < andMask.Length; i++) andMask[i] = 0xFF; // 1s = transparent
 
@@ -319,12 +337,18 @@ namespace ShakeToFindCursor
         {
             if (_isHidden) return;
 
+            // Ensure cached arrow cursor is captured BEFORE blanking system cursors!
             GetDefaultArrowCursor();
 
             IntPtr hBlank = GetBlankCursor();
             if (hBlank != IntPtr.Zero)
             {
-                NativeMethods.SetSystemCursor(hBlank, NativeMethods.OCR_NORMAL);
+                // Blank ALL system cursor roles so arrow, text beam, link hand, crosshair, etc. ALL go invisible!
+                foreach (uint id in SystemCursorIds)
+                {
+                    IntPtr hBlankCopy = NativeMethods.CopyIcon(hBlank);
+                    NativeMethods.SetSystemCursor(hBlankCopy, id);
+                }
                 _isHidden = true;
             }
         }
@@ -396,6 +420,7 @@ namespace ShakeToFindCursor
                 int dotProduct = dx * _lastDx + dy * _lastDy;
                 if (dotProduct < 0) // Sharp direction reversal!
                 {
+                    // Accumulate shake energy on each reversal
                     double addEnergy = dist * 1.5 * settings.Sensitivity;
                     _shakeEnergy += addEnergy;
                 }
@@ -486,6 +511,7 @@ namespace ShakeToFindCursor
                 return;
             }
 
+            // Hide native cursor across ALL roles (arrow, text beam, link hand, crosshair, etc.)
             if (_settings.Mode == RenderMode.HideNativeCursor && !NativeCursorHelper.IsHidden)
             {
                 NativeCursorHelper.HideNativeCursor();
@@ -647,7 +673,7 @@ namespace ShakeToFindCursor
     }
 
     // ==========================================
-    // Modern Windows 11 Resizable Settings Dialog
+    // Modern Windows 11 Styled Settings Dialog
     // ==========================================
     public class SettingsForm : Form
     {
@@ -665,8 +691,8 @@ namespace ShakeToFindCursor
         private CheckBox chkEnabled;
         private CheckBox chkStartup;
 
-        private RadioButton rbStandardOverlay;
         private RadioButton rbHideNative;
+        private RadioButton rbStandardOverlay;
 
         private Button btnTestShake;
         private Button btnSaveAndClose;
@@ -694,7 +720,7 @@ namespace ShakeToFindCursor
             this.BackColor = Color.FromArgb(32, 32, 32); // Modern Dark mode
             this.ForeColor = Color.White;
             this.Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
-            this.AutoScroll = true; // Auto scrollbar if screen height is small
+            this.AutoScroll = true;
 
             int leftMargin = 30;
             int rightAlign = 470;
@@ -753,7 +779,7 @@ namespace ShakeToFindCursor
             this.Controls.Add(chkStartup);
 
             currentY += 40;
-            // Clear, Human-Friendly Mode Selector
+            // Mode Selector
             Label lblRenderMode = new Label
             {
                 Text = "Cursor Display Style:",
@@ -765,27 +791,27 @@ namespace ShakeToFindCursor
             this.Controls.Add(lblRenderMode);
 
             currentY += 25;
-            rbStandardOverlay = new RadioButton
+            rbHideNative = new RadioButton
             {
-                Text = "🌟 Standard Pointer Overlay (Recommended)",
+                Text = "🌟 Hide Original Cursor While Enlarged (Bazzite / macOS Style)",
                 Font = new Font("Segoe UI", 9.5F),
                 ForeColor = Color.FromArgb(96, 205, 255),
                 Location = new Point(leftMargin + 10, currentY),
                 Size = new Size(440, 25),
                 Checked = true
             };
-            this.Controls.Add(rbStandardOverlay);
+            this.Controls.Add(rbHideNative);
 
             currentY += 28;
-            rbHideNative = new RadioButton
+            rbStandardOverlay = new RadioButton
             {
-                Text = "Hide Original Cursor While Enlarged",
+                Text = "Standard Pointer Overlay (Leave native cursor underneath)",
                 Font = new Font("Segoe UI", 9.5F),
                 ForeColor = Color.FromArgb(200, 200, 200),
                 Location = new Point(leftMargin + 10, currentY),
                 Size = new Size(440, 25)
             };
-            this.Controls.Add(rbHideNative);
+            this.Controls.Add(rbStandardOverlay);
 
             currentY += 40;
             // Slider 1: Max Cursor Size
@@ -953,6 +979,7 @@ namespace ShakeToFindCursor
             btnApply = new Button
             {
                 Text = "Apply",
+                UseMnemonic = false,
                 Font = new Font("Segoe UI Semibold", 10F),
                 BackColor = Color.FromArgb(55, 55, 55),
                 ForeColor = Color.White,
@@ -968,6 +995,7 @@ namespace ShakeToFindCursor
             btnCancel = new Button
             {
                 Text = "Cancel",
+                UseMnemonic = false,
                 Font = new Font("Segoe UI", 10F),
                 BackColor = Color.FromArgb(45, 45, 45),
                 ForeColor = Color.White,
@@ -986,8 +1014,8 @@ namespace ShakeToFindCursor
             chkEnabled.Checked = _settings.Enabled;
             chkStartup.Checked = _settings.StartWithWindows;
 
-            if (_settings.Mode == RenderMode.OverlayOnly) rbStandardOverlay.Checked = true;
-            else rbHideNative.Checked = true;
+            if (_settings.Mode == RenderMode.HideNativeCursor) rbHideNative.Checked = true;
+            else rbStandardOverlay.Checked = true;
 
             tbMaxSize.Value = Math.Max(100, Math.Min(500, _settings.MaxCursorSize));
             lblMaxSizeVal.Text = string.Format("{0} px", tbMaxSize.Value);
@@ -1008,7 +1036,7 @@ namespace ShakeToFindCursor
         {
             _settings.Enabled = chkEnabled.Checked;
             _settings.StartWithWindows = chkStartup.Checked;
-            _settings.Mode = rbStandardOverlay.Checked ? RenderMode.OverlayOnly : RenderMode.HideNativeCursor;
+            _settings.Mode = rbHideNative.Checked ? RenderMode.HideNativeCursor : RenderMode.OverlayOnly;
             _settings.MaxCursorSize = tbMaxSize.Value;
             _settings.Sensitivity = tbSensitivity.Value / 10.0;
             _settings.ShrinkSpeed = tbShrinkSpeed.Value / 100.0;
