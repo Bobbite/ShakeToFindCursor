@@ -24,6 +24,8 @@ A fast, lightweight, native Windows 11 utility inspired by **Bazzite** and **mac
   - **Shrink Animation Speed**: Control how quickly the cursor contracts when shaking stops.
   - **Test Shake Button**: Live preview cursor expansion directly inside settings window.
   - **Start with Windows**: Toggle automatic startup on Windows boot.
+  - **Live Preview**: Every setting applies the instant you change it. **Save** keeps it, **Cancel** discards it.
+- ⌨️ **Global Shortcut**: Toggle shake detection on or off from anywhere with **Ctrl + F7** — including from inside a game, without alt-tabbing. Rebindable to any combination (media and browser keys included), with an optional notification when it fires.
 - 🚀 **Zero External Dependencies**: Single standalone executable (`ShakeToFindCursor.exe`). No extra runtimes or installers needed.
 - 🛡️ **Registry Safe**: Never writes to or modifies your Windows cursor scheme registry settings.
 
@@ -69,6 +71,8 @@ This generates `ShakeToFindCursor.exe` in your project folder.
 | **Cursor Display Style** | Choose between hiding the native cursor (macOS-style) or standard overlay mode. |
 | **Custom Cursor Graphic** | Use a custom image file as the enlarged cursor with auto-detected or manual hotspot. |
 | **Start with Windows** | Configures auto-start on Windows boot. |
+| **Global Shortcut** | Turns shake detection on/off from any application, including games. Default **Ctrl + F7**, rebindable. |
+| **Notifications** | Show a tray notification when the shortcut toggles shake detection. |
 
 ---
 
@@ -79,6 +83,18 @@ Blanks the original system cursor while the enlarged overlay is shown. Gives a c
 
 ### Standard Overlay
 Leaves the native cursor visible underneath the enlarged overlay. The app never touches any system cursor APIs in this mode — zero risk of cursor interference.
+
+---
+
+## ⌨️ Global Shortcut
+
+Press **Ctrl + F7** anywhere — desktop, browser, or mid-game — to turn shake detection off when the enlarged cursor is getting in the way, and again to turn it back on. A tray notification confirms the change (this can be switched off).
+
+To rebind it, open **Settings**, click the shortcut box, and press the combination you want. It needs at least one of Ctrl, Alt or Shift plus another key. Media, browser and launch keys on keyboards that have them work too.
+
+If the box reports *"Already used by another app"*, another program has claimed that combination — pick a different one.
+
+> **Note:** Macro keys handled by their own vendor software (Logitech G-keys, Razer M-keys, and similar) never reach Windows as a normal key press, so no application can bind them directly. Map them to a standard combination in the vendor's software first, then bind that here.
 
 ---
 
