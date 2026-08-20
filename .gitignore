@@ -2,3 +2,6 @@
 scratch/
 *.pdb
 *.tmp
+
+# Local developer notes, not published
+handoff.md
